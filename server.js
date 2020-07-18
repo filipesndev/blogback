@@ -23,3 +23,6 @@ new Ignitor(require('@adonisjs/fold'))
   .appRoot(__dirname)
   .fireHttpServer()
   .catch(console.error)
+
+var porta = process.env.PORT || 8080;
+app.listen(porta);
