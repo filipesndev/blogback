@@ -2,6 +2,7 @@
 const Post = use('App/Models/Post')
 const Helpers = use('Helpers')
 const fs = require('fs')
+const Drive = use('Drive')
 /** @typedef {import('@adonisjs/framework/src/Request')} Request */
 /** @typedef {import('@adonisjs/framework/src/Response')} Response */
 /** @typedef {import('@adonisjs/framework/src/View')} View */
@@ -71,41 +72,60 @@ class PostController {
     const post = await Post.findOrFail(params.id)
     await post.delete()
     return {
-      message: 'Post deletado com sucesso' 
+      message: 'Post deletado com sucesso'
     }
   }
 
   async upload ({request, response, params}) {
-    const images = request.file('image', {
-      types: ['image'],
-      size: '10mb'
-    })
-  
-    await images.moveAll(Helpers.tmpPath('uploads'), (file) => {
-      return {
-        overwrite: true
-      }
-    })
-  
-    if (!images.movedAll()) {
-      return images.errors()
-    }
-    
-    const post = await Post.findOrFail(params.id)
-    images.movedList().map(
-      (file, index) => {
-        if(index === 0){
-          post.banner = file.fileName
-        }else if(index === 1){
-          post.minibanner = file.fileName
-        }
-      }
-    )
-    await post.save()
 
-    return{
-      fileName: images.fileName
-    }
+    let c = 0
+
+    request.multipart.file('image', {}, async file => {
+      const post = await Post.findOrFail(params.id)
+      const config = {
+        ContentType: file.headers['content-type'],
+        ACL: 'public-read'
+      }
+      const fileName = Date.now().toString(32) + '-' + file.clientName.replace(' ', '-')
+      const urlImage = await Drive.disk('s3').put(fileName, file.stream, config)
+      post[c === 0 ? 'banner' : 'minibanner'] = urlImage
+      await post.save()
+      ++c
+    })
+
+    await request.multipart.process()
+    return response.ok()
+
+    // const images = request.file('image', {
+    //   types: ['image'],
+    //   size: '10mb'
+    // })
+  
+    // await images.moveAll(Helpers.tmpPath('uploads'), (file) => {
+    //   return {
+    //     overwrite: true
+    //   }
+    // })
+  
+    // if (!images.movedAll()) {
+    //   return images.errors()
+    // }
+    
+    // const post = await Post.findOrFail(params.id)
+    // images.movedList().map(
+    //   (file, index) => {
+    //     if(index === 0){
+    //       post.banner = file.fileName
+    //     }else if(index === 1){
+    //       post.minibanner = file.fileName
+    //     }
+    //   }
+    // )
+    // await post.save()
+
+    // return{
+    //   fileName: images.fileName
+    // }
   }
 
   async showImg ({params, request, response}) {
